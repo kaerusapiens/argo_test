@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: dag-withparams-example-
+spec:
+  entrypoint: dag-workflow
+  templates:
+    - name: dag-workflow
+      dag:
+        tasks:
+          # 🔥 포켓몬 데이터 가져오기 (병렬 실행)
+          - name: fetch-pokemon
+            template: fetch-data
+            arguments:
+              parameters:
+                - name: pokemon
+                  value: "{{item}}"
+            withParam: '["Pikachu", "Charmander", "Squirtle"]'
+
+          # 🔥 포켓몬 데이터 처리 (병렬 실행)
+          - name: process-pokemon
+            dependencies: [fetch-pokemon]
+            template: process-data
+            arguments:
+              parameters:
+                - name: pokemon
+                  value: "{{item}}"
+            withParam: "{{tasks.fetch-pokemon.outputs.parameters.pokemon_output}}"
+
+          # 🎉 최종 요약 단계
+          - name: finalize
+            dependencies: [process-pokemon]
+            template: summary
+
+    # 🔥 포켓몬 데이터 가져오기 단계
+    - name: fetch-data
+      inputs:
+        parameters:
+          - name: pokemon
+      container:
+        image: alpine
+        command: [sh, -c]
+        args:
+          - |
+            echo "Fetching data for {{inputs.parameters.pokemon}}"
+            echo "{{inputs.parameters.pokemon}}" > /tmp/output.txt
+      outputs:
+        parameters:
+          - name: pokemon_output
+            valueFrom:
+              path: /tmp/output.txt
+
+    # 🔥 포켓몬 데이터 처리 단계
+    - name: process-data
+      inputs:
+        parameters:
+          - name: pokemon
+      container:
+        image: alpine
+        command: [sh, -c]
+        args:
+          - "echo Processing {{inputs.parameters.pokemon}}"
+
+    # 🎉 최종 단계
+    - name: summary
+      container:
+        image: alpine
+        command: [sh, -c]
+        args:
+          - "echo All Pokémon processed! 🎉"

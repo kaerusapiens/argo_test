@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: artifact-example-
+  namespace: argo
+spec:
+  entrypoint: literal-test
+  onExit: on-exithandler
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  templates:
+    - name: literal-test
+      steps:
+        - - name: step1
+            template: main
+          
+    - name: main
+      container:
+        image: busybox
+        command: [sh, -c]
+        args: 
+         - exit 1
+    - name: parsing
+      outputs:
+        parameters:
+          - name: parsed-failures
+            valueFrom:
+              path: /tmp/parsed_failures.txt
+      script:
+        image: alpine
+        command: [sh, -c]
+        source: |
+          apk add --no-cache jq
+          echo '```' > /tmp/parsed_failures.txt
+          echo '{{workflow.failures}}' | jq -r 'fromjson | .[] | "\(.displayName)\t\(.phase)\t\(.finishedAt)\t\(.message)"' | \
+          while IFS=$(printf '\t') read -r displayName phase finishedAt message; do
+            utc_epoch=$(date -d "$finishedAt" +%s 2>/dev/null || echo "0")
+            if [ "$utc_epoch" != "0" ]; then
+              jst_epoch=$((utc_epoch + 32400))  # Add 9 hours (32400 seconds)
+              jst_time=$(date -d "@$jst_epoch" '+%Y-%m-%d %H:%M:%S JST' 2>/dev/null || echo "$finishedAt")
+            else
+              jst_time="$finishedAt"
+            fi
+            printf "‣ displayName: %s %s at %s\n" "$displayName" "$phase" "$jst_time"
+            printf "└───%s\n" "$message"
+          done >> /tmp/parsed_failures.txt
+          echo '```' >> /tmp/parsed_failures.txt
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp
+    - name: on-exithandler
+      steps:
+        - - name: parse-failures
+            template: parsing
+        - - name: output-parameters
+            template: output-parsed-failures
+            arguments:
+              parameters:
+                - name: parsed-failures
+                  value: "{{steps.parse-failures.outputs.parameters.parsed-failures}}"
+          
+    - name: output-parsed-failures
+      inputs:
+        parameters:
+          - name: parsed-failures
+      script:
+        image: alpine
+        command: [sh, -c]
+        source: |
+            PARSED_FAILURES=$(cat << 'EOF'
+            {{inputs.parameters.parsed-failures}}
+            EOF
+            )
+            echo "$PARSED_FAILURES"

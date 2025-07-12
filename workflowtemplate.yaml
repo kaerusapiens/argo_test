@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: artifact-example
+  namespace: argo
+spec:
+  entrypoint: test
+  templates:
+    - name: test
+      steps:
+        - - name: step1
+            template: step1
+            when: "{{w}}"
+        - - name: step2
+            template: step2
+    - name: step1
+      container:
+        image: busybox
+        command: ["echo", "{{ http://ss | toString }}"]
+    - name: step2
+      container:
+        image: busybox
+        command: ["echo", "Hello! from workflow"]

@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: artifact-example-
+spec:
+  entrypoint: my-workflow
+  templates:
+    - name: my-workflow
+      steps:
+        - - name: loop-step
+            template: print-number
+            withSequence:
+              start: 1
+              end: 5
+            arguments:  # ⭐ 인자 전달 추가 ⭐
+              parameters:
+                - name: number
+                  value: "{{item}}"  # 🔥 반복 숫자 넣어주기!
+    - name: print-number
+      inputs:
+        parameters:
+          - name: number
+      container:
+        image: alpine
+        command: [echo, "현재 숫자: {{inputs.parameters.number}}"]

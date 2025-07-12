@@ -33,17 +33,12 @@ spec:
         source: |
           apk add --no-cache jq
           echo '```' > /tmp/parsed_failures.txt
-          echo '{{workflow.failures}}' | jq -r 'fromjson | .[] | "\(.displayName)\t\(.phase)\t\(.finishedAt)\t\(.message)"' | \
-          while IFS=$(printf '\t') read -r displayName phase finishedAt message; do
-            utc_epoch=$(date -d "$finishedAt" +%s 2>/dev/null || echo "0")
-            if [ "$utc_epoch" != "0" ]; then
-              jst_epoch=$((utc_epoch + 32400))  # Add 9 hours (32400 seconds)
-              jst_time=$(date -d "@$jst_epoch" '+%Y-%m-%d %H:%M:%S JST' 2>/dev/null || echo "$finishedAt")
-            else
-              jst_time="$finishedAt"
-            fi
-            printf "‣ displayName: %s %s at %s\n" "$displayName" "$phase" "$jst_time"
-            printf "└───%s\n" "$message"
+          echo '{{workflow.failures}}' | jq -r 'fromjson | .[] | "\(.displayName)\t\(.phase)\t\(.podName)\t\(.finishedAt)\t\(.message)"' | \
+          while IFS=$(printf '\t') read -r displayName phase podName finishedAt message; do
+            printf "‣ displayName: %s %s\n" "$displayName" "$phase"
+            printf "└───podName: %s\n" "$podName"
+            printf "└───message: %s\n" "$message"
+            printf "└───finishedAt: %s\n" "$finishedAt"
           done >> /tmp/parsed_failures.txt
           echo '```' >> /tmp/parsed_failures.txt
         volumeMounts:
@@ -59,17 +54,18 @@ spec:
               parameters:
                 - name: parsed-failures
                   value: "{{steps.parse-failures.outputs.parameters.parsed-failures}}"
-          
     - name: output-parsed-failures
       inputs:
         parameters:
           - name: parsed-failures
+            value: /tmp/parsed_failures.txt
       script:
         image: alpine
         command: [sh, -c]
         source: |
-            PARSED_FAILURES=$(cat << 'EOF'
+            cat << 'EOF' | tee /tmp/parsed_failures.txt
             {{inputs.parameters.parsed-failures}}
             EOF
-            )
-            echo "$PARSED_FAILURES"
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp

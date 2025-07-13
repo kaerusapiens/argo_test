@@ -12,15 +12,75 @@ spec:
   templates:
     - name: literal-test
       steps:
+        - - name: sprig-test
+            template: sprig-test
         - - name: step1
             template: main
+    - name: sprig-test
+      inputs:
+        parameters:
+          - name: user
+            value: "{{=sprig.get({'name': 'John', 'age': 30}, 'name')}}"
+          - name: now
+            value : "{{=now().Year()}}"
+      script:
+        image: alpine
+        command: [sh, -c]
+        source: |
+          echo {{=type(false)}} #bool
+          echo {{=type("false")}} #string
+          echo {{=type(string(123))}} #string
           
+          echo {{="test,test,test" | split(",")}} #[test,test,test]
+          echo {{='John' in ['John', 'Jane'] ? 'Exist' : 'Not Exist'}} # Exist
+          echo {{=replace("Hello World", "World", "Universe")}} #Hello Universe
+          echo {{=join(["apple", "orange","grape"], ",")}} #" is must required.
+          echo {{=keys({"name": "John", "age": 30})}} #[age,name]
+          echo {{=values({"name": "John", "age": 30})}} #[John,30]
+
+          cat << 'EOF'
+          {{=trim("\nHello\n", "\n")}}
+          {{=replace("\nHello\n", "\n", "")}}
+          EOF
+          
+          
+          echo {{=sprig.upper('hello') }}
+          echo {{=sprig.dateInZone("20060102", sprig.now(), "Asia/Seoul") }}
+          echo {{=sprig.date("20060102", sprig.now())}}
+          echo {{inputs.parameters.user}} #John
+          echo {{inputs.parameters.now}}
     - name: main
       container:
         image: busybox
         command: [sh, -c]
         args: 
          - exit 1
+
+    - name: on-exithandler
+      steps:
+        - - name: parse-failures-new
+            template: parsing-new
+            when : "{{workflow.status}} == Failed"      
+        - - name: parse-failures
+            template: parsing
+            when : "{{workflow.status}} == Failed"
+        - - name: output-parameters
+            template: output-parsed-failures
+            when : "{{workflow.status}} == Failed"
+            arguments:
+              parameters:
+                - name: parsed-failures
+                  value: "{{steps.parse-failures.outputs.parameters.parsed-failures}}"
+    - name: parsing-new
+      inputs:
+        parameters:
+          - name: sample
+            value : "{{=sprig.fromJson(workflow.failures)}}"
+      script:
+        image: alpine
+        command: [sh, -c]
+        source: |
+          echo {{inputs.parameters.sample}}
     - name: parsing
       outputs:
         parameters:
@@ -33,27 +93,19 @@ spec:
         source: |
           apk add --no-cache jq
           echo '```' > /tmp/parsed_failures.txt
-          echo '{{workflow.failures}}' | jq -r 'fromjson | .[] | "\(.displayName)\t\(.phase)\t\(.podName)\t\(.finishedAt)\t\(.message)"' | \
-          while IFS=$(printf '\t') read -r displayName phase podName finishedAt message; do
-            printf "‣ displayName: %s %s\n" "$displayName" "$phase"
-            printf "└───podName: %s\n" "$podName"
-            printf "└───message: %s\n" "$message"
-            printf "└───finishedAt: %s\n" "$finishedAt"
-          done >> /tmp/parsed_failures.txt
+          
+          echo '{{workflow.failures}}' | jq -r '
+            fromjson
+            | map(
+                "‣ displayName: \(.displayName)\n   └ message: \(.message)\n   └ podName: \(.podName)\n   └ finishedAt: \(.finishedAt)"
+            )
+            | join("\n\n")
+          ' >> /tmp/parsed_failures.txt
+          
           echo '```' >> /tmp/parsed_failures.txt
         volumeMounts:
           - name: tmp
             mountPath: /tmp
-    - name: on-exithandler
-      steps:
-        - - name: parse-failures
-            template: parsing
-        - - name: output-parameters
-            template: output-parsed-failures
-            arguments:
-              parameters:
-                - name: parsed-failures
-                  value: "{{steps.parse-failures.outputs.parameters.parsed-failures}}"
     - name: output-parsed-failures
       inputs:
         parameters:

@@ -21,8 +21,6 @@ spec:
         parameters:
           - name: user
             value: "{{=sprig.get({'name': 'John', 'age': 30}, 'name')}}"
-          - name: now
-            value : "{{=now().Year()}}"
       script:
         image: alpine
         command: [sh, -c]
@@ -43,12 +41,19 @@ spec:
           {{=replace("\nHello\n", "\n", "")}}
           EOF
           
-          
+          echo {{=upper('hello') }}
           echo {{=sprig.upper('hello') }}
+
+          echo {{=now()}}
           echo {{=sprig.dateInZone("20060102", sprig.now(), "Asia/Seoul") }}
           echo {{=sprig.date("20060102", sprig.now())}}
+          echo {{=sprig.date("2006-01-02", sprig.dateModify("-24h", sprig.now()))}}
+          
+          echo {{=trim('  name   ')}} #name
+          echo {{=sprig.trim('  name   ')}} #name
+
           echo {{inputs.parameters.user}} #John
-          echo {{inputs.parameters.now}}
+          echo {{=sprig.last( ['one', 'two', 'three'] ) }}
     - name: main
       container:
         image: busybox

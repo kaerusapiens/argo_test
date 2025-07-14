@@ -3,4 +3,8 @@ kind: ConfigMap
 metadata:
   name: workflow-controller-configmap
   namespace: argo
+data:
+  workflow: |
+    expression:
+      enabled: true
 

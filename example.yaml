@@ -54,6 +54,7 @@ spec:
 
           echo {{inputs.parameters.user}} #John
           echo {{=sprig.last( ['one', 'two', 'three'] ) }}
+          echo {{= map(['a', 'b', 'c'], { 'item-' + # }) }}
     - name: main
       container:
         image: busybox

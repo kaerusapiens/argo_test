@@ -30,6 +30,7 @@ argo submit --watch https://raw.githubusercontent.com/argoproj/argo-workflows/ma
 /hello-world.yaml -n argo
 
 argo logs artifact-example-4f6gl -n argo
+argo submit -n argo steps-steps.yaml --log
 
 ```
 ## Argo Workflow 예제 실행 (로컬 파일)

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: hello-world-workflow-
+  namespace: default
+spec:
+  entrypoint: main
+  onExit: on-exit-handler
+  templates:
+    - name: main
+      steps:
+      - - name: main-step
+          template: main-step
+    - name: main-step
+      container:
+        image: busybox
+        command: [sh, -c]
+        args: 
+         - "exit 1;"
+    - name: on-exit-handler
+      steps:
+      - - name: parsing-new
+          when: "{{workflow.status}} == Failed"
+          templateRef:
+            name: hello-world-template
+            template: hello-world
+          arguments:
+            parameters:
+            - name: message
+              value: "{{workflow.failures}}"

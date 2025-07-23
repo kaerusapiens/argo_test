@@ -1,23 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: artifact-example
-  namespace: argo
+  name: hello-world-template
+  namespace: default
 spec:
-  entrypoint: test
+  entrypoint: hello-world
   templates:
-    - name: test
-      steps:
-        - - name: step1
-            template: step1
-            when: "{{w}}"
-        - - name: step2
-            template: step2
-    - name: step1
-      container:
-        image: busybox
-        command: ["echo", "{{ http://ss | toString }}"]
-    - name: step2
-      container:
-        image: busybox
-        command: ["echo", "Hello! from workflow"]
+  - name: hello-world
+    inputs:
+      parameters:
+      - name: message
+    container:
+      image: alpine:latest
+      command: ["/bin/sh"]
+      args: ["-c", "set -x && echo '{{inputs.parameters.message}}'"]

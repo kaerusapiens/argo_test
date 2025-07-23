@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: steps-in-steps-
+  namespace: argo
+spec:
+  entrypoint: main-steps
+  templates:
+    - name: main-steps
+      steps:
+      - - name: a
+          template: echo-template
+          arguments:
+            parameters: [{name: message, value: "Step a"}]
+      - - name: b
+          template: echo-template
+          arguments:
+            parameters: [{name: message, value: "Step b"}]
+      - 
+        - name: c-flow
+          template: c-steps-flow
+        - name: d-flow
+          template: d-steps-flow
+      - - name: e
+          template: echo-template
+          arguments:
+            parameters: [{name: message, value: "Step e"}]
+
+    # =================================================================
+    # サブテンプレート: c1 -> c2 の直列フロー
+    # =================================================================
+    - name: c-steps-flow
+      steps:
+        - - name: c1
+            template: echo-template
+            arguments:
+              parameters: [{name: message, value: "Step c1"}]
+        - - name: c2
+            template: echo-template
+            arguments:
+              parameters: [{name: message, value: "Step c2"}]
+
+    # =================================================================
+    # サブテンプレート: d1 -> d2 の直列フロー
+    # =================================================================
+    - name: d-steps-flow
+      steps:
+        - - name: d1
+            template: echo-template
+            arguments:
+              parameters: [{name: message, value: "Step d1"}]
+        - - name: d2
+            template: echo-template
+            arguments:
+              parameters: [{name: message, value: "Step d2"}]
+
+    # =================================================================
+    # 各ステップで再利用するシンプルな echo テンプレート
+    # =================================================================
+    - name: echo-template
+      inputs:
+        parameters:
+          - name: message
+      container:
+        image: busybox
+        command: [sh, -c]
+        args: ["echo {{inputs.parameters.message}}"]
